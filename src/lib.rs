@@ -509,7 +509,7 @@ fn resolve_path(path: &str, base_url: &str, vars: &HashMap<String, String>) -> R
         });
 
     if resolved.starts_with("http://") || resolved.starts_with("https://") {
-        return Ok(resolved);
+        return Ok(normalize_url(&resolved));
     }
 
     let base = base_url.trim_end_matches('/');
@@ -517,7 +517,24 @@ fn resolve_path(path: &str, base_url: &str, vars: &HashMap<String, String>) -> R
     if p.is_empty() {
         Ok(base.to_string())
     } else {
-        Ok(format!("{}/{}", base, p))
+        Ok(normalize_url(&format!("{}/{}", base, p)))
+    }
+}
+
+/// Normalize a URL: lowercase scheme+host, collapse duplicate slashes in path,
+/// strip trailing slash on bare-origin paths so `https://h/` == `https://h`.
+fn normalize_url(url: &str) -> String {
+    if let Ok(mut u) = Url::parse(url) {
+        let path = u.path().replace("//", "/");
+        let path = if path == "/" {
+            path
+        } else {
+            path.trim_end_matches('/').to_string()
+        };
+        u.set_path(&path);
+        u.to_string()
+    } else {
+        url.trim_end_matches('/').to_string()
     }
 }
 

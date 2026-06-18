@@ -70,11 +70,11 @@ impl Default for Config {
             templates: Vec::new(),
             output: None,
             output_format: OutputFormat::Text,
-            rate_limit: 10.0, // 10 requests per second
-            delay: Duration::from_millis(100),
-            timeout: Duration::from_secs(30),
-            max_redirects: 3,
-            user_agent: "ruclei/1.0".to_string(),
+            rate_limit: 150.0, // match nuclei default
+            delay: Duration::ZERO,
+            timeout: Duration::from_secs(10),
+            max_redirects: 10,
+            user_agent: "Mozilla/5.0 (compatible; ruclei)".to_string(),
             headers: Vec::new(),
             proxy: None,
             verbose: false,
@@ -84,7 +84,7 @@ impl Default for Config {
             tag_filter: None,
             include_templates: None,
             exclude_templates: None,
-            max_retries: 3,
+            max_retries: 0, // no retries by default — one attempt per request
             show_stats: false,
             concurrency: 25,
             no_banner: false,
@@ -146,7 +146,7 @@ pub fn build_cli() -> Command {
                 .value_name("RPS")
                 .help("Rate limit in requests per second")
                 .value_parser(clap::value_parser!(f64))
-                .default_value("10.0"),
+                .default_value("150.0"),
         )
         .arg(
             Arg::new("delay")
@@ -162,7 +162,7 @@ pub fn build_cli() -> Command {
                 .value_name("SECONDS")
                 .help("HTTP timeout in seconds")
                 .value_parser(clap::value_parser!(u64))
-                .default_value("30"),
+                .default_value("10"),
         )
         .arg(
             Arg::new("max-redirects")
@@ -170,7 +170,7 @@ pub fn build_cli() -> Command {
                 .value_name("NUM")
                 .help("Maximum redirects to follow")
                 .value_parser(clap::value_parser!(u32))
-                .default_value("3"),
+                .default_value("10"),
         )
         .arg(
             Arg::new("user-agent")
@@ -253,7 +253,7 @@ pub fn build_cli() -> Command {
                 .value_name("NUM")
                 .help("Maximum retries for failed requests")
                 .value_parser(clap::value_parser!(u32))
-                .default_value("3"),
+                .default_value("0"),
         )
         .arg(
             Arg::new("stats")

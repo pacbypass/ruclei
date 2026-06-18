@@ -49,17 +49,45 @@ impl ScanRequest {
         self
     }
 
-    /// Generate a cache key for request deduplication
+    /// Canonical URL for deduplication: strip trailing slash, lowercase scheme+host.
+    fn canonical_url(&self) -> String {
+        // Parse to normalize scheme+host casing and trailing slashes on bare origin
+        if let Ok(mut u) = url::Url::parse(&self.url) {
+            // Strip trailing slash on bare-origin paths
+            let path = u.path().trim_end_matches('/').to_string();
+            let canonical_path = if path.is_empty() {
+                "/".to_string()
+            } else {
+                path
+            };
+            u.set_path(&canonical_path);
+            u.to_string()
+        } else {
+            // Fallback: strip trailing slash manually
+            self.url.trim_end_matches('/').to_string()
+        }
+    }
+
+    /// Generate a cache key for request deduplication.
+    /// Uses a canonical URL so that trailing-slash variants and bare origins
+    /// (e.g. https://host vs https://host/) share the same cache entry.
     pub fn cluster_key(&self) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
-        self.url.hash(&mut hasher);
-        self.method.hash(&mut hasher);
-        let mut sorted: Vec<_> = self.headers.iter().collect();
+        self.canonical_url().hash(&mut hasher);
+        self.method.to_uppercase().hash(&mut hasher);
+        // Exclude per-template headers that don't affect response content
+        // (e.g. User-Agent, Accept-Language vary per config but return same page)
+        let skip: &[&str] = &["user-agent", "accept-language", "accept-encoding"];
+        let mut sorted: Vec<_> = self
+            .headers
+            .iter()
+            .filter(|(k, _)| !skip.contains(&k.to_lowercase().as_str()))
+            .collect();
         sorted.sort_by_key(|(k, _)| k.as_str());
         for (k, v) in sorted {
-            k.hash(&mut hasher);
+            k.to_lowercase().hash(&mut hasher);
             v.hash(&mut hasher);
         }
         if let Some(b) = &self.body {
