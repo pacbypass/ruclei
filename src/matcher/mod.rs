@@ -326,7 +326,7 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
     if let Some(inner) = expr.strip_prefix('!') {
         let inner = inner.trim();
         let is_fn_call =
-            inner.chars().next().map_or(false, |c| c.is_alphabetic()) && inner.contains('(');
+            inner.chars().next().is_some_and(|c| c.is_alphabetic()) && inner.contains('(');
         if !is_fn_call {
             return !eval_dsl_bool(inner, resp);
         }
