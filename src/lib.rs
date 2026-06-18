@@ -109,14 +109,22 @@ impl RucleiScanner {
             .ok(); // ok() because it can only be set once; ignore if already set
 
         Ok(Self {
+            template_parser: {
+                let mut p = TemplateParser::new();
+                p.no_cache = config.no_cache;
+                p
+            },
             config: Arc::new(config),
             http_client: Arc::new(http_client),
-            template_parser: TemplateParser::new(),
             request_cluster: Arc::new(Mutex::new(RequestCluster::new())),
             rate_limiter: Arc::new(Mutex::new(rate_limiter)),
             templates: Vec::new(),
             stats: ScanStats::default(),
         })
+    }
+
+    pub fn clear_template_cache(&self) -> Result<()> {
+        self.template_parser.clear_cache()
     }
 
     pub fn load_templates(&mut self) -> Result<()> {
@@ -209,16 +217,15 @@ impl RucleiScanner {
 
                 stats.templates_executed.fetch_add(1, Ordering::Relaxed);
 
-                let results = execute_template(
-                    template,
-                    target,
-                    &http,
-                    &cl,
-                    &rl,
-                    &stats,
-                    &cfg,
+                let ctx = ExecCtx {
+                    http_client: &http,
+                    cluster: &cl,
+                    rate_limiter: &rl,
+                    stats: &stats,
+                    config: &cfg,
                     max_cache,
-                );
+                };
+                let results = execute_template(template, target, &ctx);
 
                 match results {
                     Ok(rs) => {
@@ -308,16 +315,21 @@ impl RucleiScanner {
 
 // ─── Parallel template execution (free function so rayon can call it) ─────────
 
+struct ExecCtx<'a> {
+    http_client: &'a Arc<HttpClient>,
+    cluster: &'a Arc<Mutex<RequestCluster>>,
+    rate_limiter: &'a Arc<Mutex<RateLimiter>>,
+    stats: &'a Arc<AtomicStats>,
+    config: &'a Arc<Config>,
+    max_cache: usize,
+}
+
 fn execute_template(
     template: &Template,
     target: &str,
-    http_client: &Arc<HttpClient>,
-    cluster: &Arc<Mutex<RequestCluster>>,
-    rate_limiter: &Arc<Mutex<RateLimiter>>,
-    stats: &Arc<AtomicStats>,
-    config: &Arc<Config>,
-    max_cache: usize,
+    ctx: &ExecCtx<'_>,
 ) -> Result<Vec<ScanResult>> {
+    let ExecCtx { http_client, cluster, rate_limiter, stats, config, max_cache } = ctx;
     let mut matcher_engine = MatcherEngine::new();
     let mut extractor_engine = ExtractorEngine::new();
 
@@ -376,7 +388,7 @@ fn execute_template(
                                 let mut c = cluster.lock().unwrap();
                                 c.cache_response(&scan_req, r.clone());
                                 // Evict if too large
-                                if c.cache_size() > max_cache {
+                                if c.cache_size() > *max_cache {
                                     c.cleanup(max_cache / 2);
                                 }
                             }

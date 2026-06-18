@@ -1,16 +1,3 @@
-/// Parse raw HTTP request strings from nuclei templates.
-///
-/// Nuclei templates can specify raw HTTP requests like:
-/// ```yaml
-/// raw:
-///   - |
-///     POST /api/login HTTP/1.1
-///     Host: {{Hostname}}
-///     Content-Type: application/json
-///
-///     {"user":"admin"}
-/// ```
-
 use crate::scanner::ScanRequest;
 use anyhow::Result;
 use std::collections::HashMap;

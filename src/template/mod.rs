@@ -3,6 +3,7 @@ use serde::de::{self, Visitor};
 use std::collections::HashMap;
 use std::fmt;
 
+pub mod cache;
 pub mod parser;
 
 fn string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>

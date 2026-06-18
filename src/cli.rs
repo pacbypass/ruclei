@@ -48,6 +48,12 @@ pub struct Config {
     pub concurrency: usize,
     /// No banner (silent startup)
     pub no_banner: bool,
+    /// Skip disk template cache
+    pub no_cache: bool,
+    /// Clear disk template cache and exit
+    pub clear_cache: bool,
+    /// Load templates and print count, then exit without scanning
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +88,9 @@ impl Default for Config {
             show_stats: false,
             concurrency: 25,
             no_banner: false,
+            no_cache: false,
+            clear_cache: false,
+            dry_run: false,
         }
     }
 }
@@ -267,6 +276,24 @@ pub fn build_cli() -> Command {
                 .help("Disable colored output")
                 .action(ArgAction::SetTrue)
         )
+        .arg(
+            Arg::new("no-cache")
+                .long("no-cache")
+                .help("Disable template disk cache (always parse from YAML)")
+                .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("clear-cache")
+                .long("clear-cache")
+                .help("Clear the template disk cache and exit")
+                .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("dry-run")
+                .long("dry-run")
+                .help("Load templates and print count, then exit without scanning")
+                .action(ArgAction::SetTrue)
+        )
 }
 
 pub fn parse_args() -> anyhow::Result<Config> {
@@ -289,8 +316,10 @@ pub fn parse_args() -> anyhow::Result<Config> {
         }
     }
 
-    // Validate that we have targets
-    if config.targets.is_empty() {
+    // Validate that we have targets (skip check for maintenance-only flags)
+    let clear_cache = matches.get_flag("clear-cache");
+    let dry_run = matches.get_flag("dry-run");
+    if config.targets.is_empty() && !clear_cache && !dry_run {
         return Err(anyhow::anyhow!("No targets specified. Use -u/--target or -l/--list"));
     }
 
@@ -411,6 +440,10 @@ pub fn parse_args() -> anyhow::Result<Config> {
     if matches.get_flag("no-color") {
         colored::control::set_override(false);
     }
+
+    config.no_cache = matches.get_flag("no-cache");
+    config.clear_cache = matches.get_flag("clear-cache");
+    config.dry_run = matches.get_flag("dry-run");
 
     Ok(config)
 }

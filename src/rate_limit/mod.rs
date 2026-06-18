@@ -206,11 +206,7 @@ impl RateLimiterStats {
     }
 
     pub fn requests_remaining(&self) -> u32 {
-        if self.requests_in_window >= self.max_requests {
-            0
-        } else {
-            self.max_requests - self.requests_in_window
-        }
+        self.max_requests.saturating_sub(self.requests_in_window)
     }
 }
 

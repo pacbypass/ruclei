@@ -94,10 +94,8 @@ impl HttpClient {
         let mut headers: HashMap<String, String> = HashMap::new();
         for (k, v) in response.headers() {
             let key = k.as_str().to_lowercase();
-            if !headers.contains_key(&key) {
-                if let Ok(val) = v.to_str() {
-                    headers.insert(key, val.to_string());
-                }
+            if let Ok(val) = v.to_str() {
+                headers.entry(key).or_insert_with(|| val.to_string());
             }
         }
 

@@ -1,13 +1,35 @@
-use super::Template;
+use super::{cache::TemplateCache, Template};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
-pub struct TemplateParser;
+pub struct TemplateParser {
+    cache: TemplateCache,
+    /// When true, skip disk cache entirely (--no-cache flag)
+    pub no_cache: bool,
+}
+
+impl Default for TemplateParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl TemplateParser {
     pub fn new() -> Self {
-        Self
+        Self {
+            cache: TemplateCache::new(),
+            no_cache: false,
+        }
+    }
+
+    pub fn with_no_cache(mut self) -> Self {
+        self.no_cache = true;
+        self
+    }
+
+    pub fn clear_cache(&self) -> Result<()> {
+        self.cache.clear()
     }
 
     pub fn parse_file<P: AsRef<Path>>(&self, path: P) -> Result<Template> {
@@ -38,8 +60,23 @@ impl TemplateParser {
         if !dir_path.is_dir() {
             return Err(anyhow::anyhow!("Not a directory: {}", dir_path.display()));
         }
+
+        // Try disk cache first
+        if !self.no_cache {
+            if let Some(cached) = self.cache.load(dir_path) {
+                return Ok(cached);
+            }
+        }
+
+        // Cache miss — parse everything from YAML
         let mut templates = Vec::new();
         self.walk_directory(dir_path, &mut templates)?;
+
+        // Persist to cache for next run
+        if !self.no_cache && !templates.is_empty() {
+            self.cache.save(dir_path, &templates);
+        }
+
         Ok(templates)
     }
 

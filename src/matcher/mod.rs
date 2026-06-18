@@ -349,7 +349,7 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
     false
 }
 
-fn strip_fn<'a>(expr: &'a str, name: &str) -> Option<String> {
+fn strip_fn(expr: &str, name: &str) -> Option<String> {
     let prefix = format!("{}(", name);
     if expr.to_lowercase().starts_with(&prefix.to_lowercase()) && expr.ends_with(')') {
         Some(expr[prefix.len()..expr.len() - 1].to_string())

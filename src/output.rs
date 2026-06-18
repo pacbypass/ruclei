@@ -1,5 +1,3 @@
-/// Nuclei-compatible terminal output formatting with ANSI colors.
-
 use colored::*;
 use chrono::Local;
 use std::io::{self, Write};
