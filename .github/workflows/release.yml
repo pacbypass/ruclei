@@ -27,9 +27,9 @@ jobs:
             archive: tar.gz
             cross: true
 
-          # macOS x86_64
+          # macOS x86_64 — cross-compiled on arm64 runner (macos-13 queues are very slow)
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             archive: tar.gz
 
           # macOS Apple Silicon
