@@ -307,13 +307,29 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
         _ => {}
     }
 
-    // !expr  (negation of a sub-expression)
+    // Parenthesized group: strip outer parens when they span the whole expression
+    if expr.starts_with('(') && expr.ends_with(')') && paren_wraps_all(expr) {
+        return eval_dsl_bool(&expr[1..expr.len() - 1], resp);
+    }
+
+    // || — lowest precedence; split here so && inside sub-expressions evaluates first
+    if let Some(pos) = find_op(expr, "||") {
+        return eval_dsl_bool(&expr[..pos], resp) || eval_dsl_bool(&expr[pos + 2..], resp);
+    }
+
+    // && — higher precedence than ||
+    if let Some(pos) = find_op(expr, "&&") {
+        return eval_dsl_bool(&expr[..pos], resp) && eval_dsl_bool(&expr[pos + 2..], resp);
+    }
+
+    // ! negation — skip if it looks like a function call (!contains, !startswith, ...)
     if let Some(inner) = expr.strip_prefix('!') {
         let inner = inner.trim();
-        if !inner.starts_with(|c: char| c.is_alphabetic()) {
+        let is_fn_call =
+            inner.chars().next().map_or(false, |c| c.is_alphabetic()) && inner.contains('(');
+        if !is_fn_call {
             return !eval_dsl_bool(inner, resp);
         }
-        // fall through — might be a function like !contains(...)
     }
 
     // contains(haystack, needle)
@@ -361,12 +377,17 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
         }
     }
 
-    // Numeric comparisons for well-known variables
+    // Numeric comparisons for well-known variables, including _N indexed variants
+    // (e.g. status_code_1, status_code_2 in multi-path templates)
     for var in &["status_code", "content_length", "body_size"] {
-        if let Some(rest) = expr.strip_prefix(*var) {
+        if let Some(rest) = expr.to_lowercase().strip_prefix(*var) {
+            let rest = if rest.starts_with('_') {
+                rest.trim_start_matches(|c: char| c == '_' || c.is_ascii_digit())
+            } else {
+                rest
+            };
             let rest = rest.trim();
             if rest.is_empty() {
-                // bare variable reference — evaluate as bool (truthy)
                 return true;
             }
             if let Some((op, rhs)) = parse_cmp(rest) {
@@ -383,9 +404,20 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
         if let Some(pos) = find_op(expr, op) {
             let lhs = expr[..pos].trim();
             let rhs = expr[pos + op.len()..].trim();
+
+            // Prefer numeric: lhs as a known numeric variable, rhs as an integer literal
+            let lhs_num = resolve_num(lhs, resp);
+            if let Ok(rn) = rhs.parse::<i64>() {
+                return apply_cmp(lhs_num, op, rn);
+            }
+
+            // String comparison — require at least one side to be non-empty to avoid
+            // unknown_var == unknown_var always being true ("" == "")
             let lv = resolve_str(lhs, resp);
             let rv = resolve_str(rhs, resp);
-            // Try numeric comparison first
+            if lv.is_empty() && rv.is_empty() {
+                return false;
+            }
             if let (Ok(ln), Ok(rn)) = (lv.parse::<i64>(), rv.parse::<i64>()) {
                 return apply_cmp(ln, op, rn);
             }
@@ -398,6 +430,28 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
     }
 
     false
+}
+
+/// Returns true when the opening paren at index 0 closes at the last character.
+fn paren_wraps_all(expr: &str) -> bool {
+    let bytes = expr.as_bytes();
+    if bytes.first() != Some(&b'(') {
+        return false;
+    }
+    let mut depth = 0i32;
+    for (i, &c) in bytes.iter().enumerate() {
+        match c {
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 && i < bytes.len() - 1 {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0
 }
 
 fn strip_fn(expr: &str, name: &str) -> Option<String> {
@@ -449,7 +503,9 @@ fn resolve_str(token: &str, resp: &HttpResponse) -> String {
     {
         return token[1..token.len() - 1].to_string();
     }
-    match token.to_lowercase().as_str() {
+    // Strip _N suffix for indexed multi-request variables (body_1, body_2, status_code_1, ...)
+    let normalized = strip_index_suffix(token);
+    match normalized.to_lowercase().as_str() {
         "body" => resp.body.clone(),
         "header" | "all_headers" | "raw_header" => resp.headers_string(),
         "status_code" => resp.status.to_string(),
@@ -458,7 +514,7 @@ fn resolve_str(token: &str, resp: &HttpResponse) -> String {
         "location" => resp.get_header("location").cloned().unwrap_or_default(),
         "server" => resp.get_header("server").cloned().unwrap_or_default(),
         _ => {
-            // Try as a header name
+            // Try as a header name (use original token, not normalized)
             if let Some(v) = resp.get_header(token) {
                 return v.clone();
             }
@@ -469,10 +525,26 @@ fn resolve_str(token: &str, resp: &HttpResponse) -> String {
 }
 
 fn resolve_num(token: &str, resp: &HttpResponse) -> i64 {
-    match token.to_lowercase().as_str() {
+    let normalized = strip_index_suffix(token);
+    match normalized.to_lowercase().as_str() {
         "status_code" => resp.status as i64,
         "content_length" | "body_size" => resp.content_length as i64,
         _ => 0,
+    }
+}
+
+/// Strip a trailing `_N` suffix (underscore followed by one or more digits).
+/// Used to normalize indexed multi-request variables like `body_1`, `status_code_2`.
+fn strip_index_suffix(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    let mut i = bytes.len();
+    while i > 0 && bytes[i - 1].is_ascii_digit() {
+        i -= 1;
+    }
+    if i > 0 && i < bytes.len() && bytes[i - 1] == b'_' {
+        &s[..i - 1]
+    } else {
+        s
     }
 }
 
@@ -675,5 +747,57 @@ mod tests {
             ..Default::default()
         };
         assert!(e.evaluate_matchers(&[m], "or", &resp).unwrap().matched);
+    }
+
+    #[test]
+    fn test_dsl_and_or_compound() {
+        let resp = make_response(200, "hello world");
+
+        // Basic && — both must be true
+        assert!(eval_dsl_bool(
+            "contains(body, \"hello\") && contains(body, \"world\")",
+            &resp
+        ));
+        assert!(!eval_dsl_bool(
+            "contains(body, \"hello\") && contains(body, \"missing\")",
+            &resp
+        ));
+
+        // Basic || — either suffices
+        assert!(eval_dsl_bool(
+            "contains(body, \"missing\") || contains(body, \"world\")",
+            &resp
+        ));
+        assert!(!eval_dsl_bool(
+            "contains(body, \"nope\") || contains(body, \"also-nope\")",
+            &resp
+        ));
+
+        // Mixed precedence: && binds tighter than ||
+        // "false && false || true" → (false && false) || true = true
+        assert!(eval_dsl_bool(
+            "contains(body, \"nope\") && contains(body, \"also-nope\") || contains(body, \"hello\")",
+            &resp
+        ));
+
+        // status_code_N indexed variables must not create false positives
+        let no_dedecms = make_response(200, "innocent page");
+        assert!(!eval_dsl_bool(
+            "status_code_1 == 200 && contains(body,'DedeCMS') || contains(body,'Power by DedeCms')",
+            &no_dedecms
+        ));
+
+        // Unknown variable == unknown variable must not be true
+        assert!(!eval_dsl_bool("unknown_var_xyz == another_unknown", &resp));
+    }
+
+    #[test]
+    fn test_dsl_indexed_variables() {
+        let resp = make_response(200, "test body");
+        // status_code_1 should resolve to status_code
+        assert!(eval_dsl_bool("status_code_1 == 200", &resp));
+        assert!(!eval_dsl_bool("status_code_2 == 404", &resp));
+        // body_2 should resolve to body
+        assert!(eval_dsl_bool("contains(body_2, \"test\")", &resp));
     }
 }
