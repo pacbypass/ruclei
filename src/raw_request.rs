@@ -7,7 +7,11 @@ use std::collections::HashMap;
 /// `raw`      — the raw HTTP request string (with \n line endings)
 /// `base_url` — the resolved target base URL (used for relative paths)
 /// `vars`     — map of variable name → value for substitution ({{BaseURL}}, {{Hostname}}, etc.)
-pub fn parse_raw_request(raw: &str, base_url: &str, vars: &HashMap<String, String>) -> Result<ScanRequest> {
+pub fn parse_raw_request(
+    raw: &str,
+    base_url: &str,
+    vars: &HashMap<String, String>,
+) -> Result<ScanRequest> {
     // Apply variable substitution
     let raw = substitute_vars(raw, vars);
 
@@ -18,7 +22,14 @@ pub fn parse_raw_request(raw: &str, base_url: &str, vars: &HashMap<String, Strin
     let (header_section, body) = if let Some(pos) = find_header_body_split(&raw) {
         let (h, b) = raw.split_at(pos);
         let b = b.trim_start_matches('\n');
-        (h.trim_end(), if b.is_empty() { None } else { Some(b.to_string()) })
+        (
+            h.trim_end(),
+            if b.is_empty() {
+                None
+            } else {
+                Some(b.to_string())
+            },
+        )
     } else {
         (raw.trim(), None)
     };
@@ -26,7 +37,8 @@ pub fn parse_raw_request(raw: &str, base_url: &str, vars: &HashMap<String, Strin
     let mut lines = header_section.lines();
 
     // First line: METHOD PATH HTTP/VERSION
-    let request_line = lines.next()
+    let request_line = lines
+        .next()
         .ok_or_else(|| anyhow::anyhow!("Empty raw request"))?
         .trim();
 
@@ -40,7 +52,11 @@ pub fn parse_raw_request(raw: &str, base_url: &str, vars: &HashMap<String, Strin
         path
     } else {
         let base = base_url.trim_end_matches('/');
-        let p = if path.starts_with('/') { &path } else { &format!("/{}", path) };
+        let p = if path.starts_with('/') {
+            &path
+        } else {
+            &format!("/{}", path)
+        };
         format!("{}{}", base, p)
     };
 
@@ -48,7 +64,9 @@ pub fn parse_raw_request(raw: &str, base_url: &str, vars: &HashMap<String, Strin
     let mut headers: HashMap<String, String> = HashMap::new();
     for line in lines {
         let line = line.trim();
-        if line.is_empty() { break; }
+        if line.is_empty() {
+            break;
+        }
         if let Some(colon_pos) = line.find(':') {
             let name = line[..colon_pos].trim().to_string();
             let value = line[colon_pos + 1..].trim().to_string();
@@ -150,6 +168,9 @@ mod tests {
         let mut vars = HashMap::new();
         vars.insert("Hostname".to_string(), "test.example.com".to_string());
         let req = parse_raw_request(raw, "https://test.example.com", &vars).unwrap();
-        assert_eq!(req.headers.get("Host"), Some(&"test.example.com".to_string()));
+        assert_eq!(
+            req.headers.get("Host"),
+            Some(&"test.example.com".to_string())
+        );
     }
 }

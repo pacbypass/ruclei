@@ -18,21 +18,35 @@ pub struct MatchResult {
 
 impl MatchResult {
     pub fn matched(name: Option<String>) -> Self {
-        Self { matched: true, matcher_name: name, matched_values: vec![] }
+        Self {
+            matched: true,
+            matcher_name: name,
+            matched_values: vec![],
+        }
     }
 
     pub fn matched_with_values(name: Option<String>, values: Vec<String>) -> Self {
-        Self { matched: true, matcher_name: name, matched_values: values }
+        Self {
+            matched: true,
+            matcher_name: name,
+            matched_values: values,
+        }
     }
 
     pub fn not_matched() -> Self {
-        Self { matched: false, matcher_name: None, matched_values: vec![] }
+        Self {
+            matched: false,
+            matcher_name: None,
+            matched_values: vec![],
+        }
     }
 }
 
 impl MatcherEngine {
     pub fn new() -> Self {
-        Self { regex_cache: HashMap::new() }
+        Self {
+            regex_cache: HashMap::new(),
+        }
     }
 
     /// Evaluate all matchers with a request-level condition ("and"/"or").
@@ -58,7 +72,9 @@ impl MatcherEngine {
         };
 
         if overall {
-            let first = results.into_iter().find(|r| r.matched)
+            let first = results
+                .into_iter()
+                .find(|r| r.matched)
                 .unwrap_or_else(MatchResult::not_matched);
             Ok(first)
         } else {
@@ -66,7 +82,11 @@ impl MatcherEngine {
         }
     }
 
-    fn evaluate_single(&mut self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
+    fn evaluate_single(
+        &mut self,
+        matcher: &Matcher,
+        response: &HttpResponse,
+    ) -> Result<MatchResult> {
         let result = match matcher.matcher_type.as_str() {
             "status" => self.match_status(matcher, response)?,
             "size" => self.match_size(matcher, response)?,
@@ -92,7 +112,9 @@ impl MatcherEngine {
     }
 
     fn match_status(&self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
-        let codes = matcher.status.as_ref()
+        let codes = matcher
+            .status
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Status matcher missing status codes"))?;
         if codes.contains(&response.status) {
             Ok(MatchResult::matched_with_values(
@@ -105,7 +127,9 @@ impl MatcherEngine {
     }
 
     fn match_size(&self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
-        let sizes = matcher.size.as_ref()
+        let sizes = matcher
+            .size
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Size matcher missing sizes"))?;
         let body_size = response.body.len() as i64;
         if sizes.contains(&body_size) {
@@ -119,16 +143,23 @@ impl MatcherEngine {
     }
 
     fn match_words(&self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
-        let words = matcher.words.as_ref()
+        let words = matcher
+            .words
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Word matcher missing words"))?;
         let text = self.get_part_text(matcher.part.as_deref(), response);
         let ci = matcher.case_insensitive.unwrap_or(false);
-        let text_cmp = if ci { text.to_lowercase() } else { text.clone() };
+        let text_cmp = if ci {
+            text.to_lowercase()
+        } else {
+            text.clone()
+        };
 
         // Inner condition: "and" requires ALL words, "or" requires ANY
         let inner_cond = matcher.condition.as_deref().unwrap_or("or");
 
-        let matched_words: Vec<String> = words.iter()
+        let matched_words: Vec<String> = words
+            .iter()
             .filter(|w| {
                 let w_cmp = if ci { w.to_lowercase() } else { w.to_string() };
                 text_cmp.contains(&w_cmp)
@@ -142,14 +173,19 @@ impl MatcherEngine {
         };
 
         if matched {
-            Ok(MatchResult::matched_with_values(matcher.name.clone(), matched_words))
+            Ok(MatchResult::matched_with_values(
+                matcher.name.clone(),
+                matched_words,
+            ))
         } else {
             Ok(MatchResult::not_matched())
         }
     }
 
     fn match_regex(&mut self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
-        let patterns = matcher.regex.as_ref()
+        let patterns = matcher
+            .regex
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Regex matcher missing patterns"))?;
         let text = self.get_part_text(matcher.part.as_deref(), response);
         let inner_cond = matcher.condition.as_deref().unwrap_or("or");
@@ -168,14 +204,19 @@ impl MatcherEngine {
         };
 
         if matched {
-            Ok(MatchResult::matched_with_values(matcher.name.clone(), matched_values))
+            Ok(MatchResult::matched_with_values(
+                matcher.name.clone(),
+                matched_values,
+            ))
         } else {
             Ok(MatchResult::not_matched())
         }
     }
 
     fn match_binary(&self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
-        let patterns = matcher.binary.as_ref()
+        let patterns = matcher
+            .binary
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Binary matcher missing patterns"))?;
         let bytes = response.body.as_bytes();
         let mut found = Vec::new();
@@ -183,21 +224,27 @@ impl MatcherEngine {
         for pattern in patterns {
             let hex = pattern.replace(' ', "");
             if let Ok(needle) = hex::decode(&hex) {
-                if !needle.is_empty() && bytes.windows(needle.len()).any(|w| w == needle.as_slice()) {
+                if !needle.is_empty() && bytes.windows(needle.len()).any(|w| w == needle.as_slice())
+                {
                     found.push(pattern.clone());
                 }
             }
         }
 
         if !found.is_empty() {
-            Ok(MatchResult::matched_with_values(matcher.name.clone(), found))
+            Ok(MatchResult::matched_with_values(
+                matcher.name.clone(),
+                found,
+            ))
         } else {
             Ok(MatchResult::not_matched())
         }
     }
 
     fn match_dsl(&mut self, matcher: &Matcher, response: &HttpResponse) -> Result<MatchResult> {
-        let exprs = matcher.dsl.as_ref()
+        let exprs = matcher
+            .dsl
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("DSL matcher missing expressions"))?;
         let inner_cond = matcher.condition.as_deref().unwrap_or("or");
         let mut matched_exprs = Vec::new();
@@ -214,7 +261,10 @@ impl MatcherEngine {
         };
 
         if matched {
-            Ok(MatchResult::matched_with_values(matcher.name.clone(), matched_exprs))
+            Ok(MatchResult::matched_with_values(
+                matcher.name.clone(),
+                matched_exprs,
+            ))
         } else {
             Ok(MatchResult::not_matched())
         }
@@ -237,8 +287,7 @@ impl MatcherEngine {
 
     fn get_or_compile(&mut self, pattern: &str) -> Result<&Regex> {
         if !self.regex_cache.contains_key(pattern) {
-            let re = Regex::new(pattern)
-                .with_context(|| format!("Invalid regex: {}", pattern))?;
+            let re = Regex::new(pattern).with_context(|| format!("Invalid regex: {}", pattern))?;
             self.regex_cache.insert(pattern.to_string(), re);
         }
         Ok(self.regex_cache.get(pattern).unwrap())
@@ -292,7 +341,9 @@ fn eval_dsl_bool(expr: &str, resp: &HttpResponse) -> bool {
         let (pat, src) = split_args(&args);
         let pat_s = resolve_str(&pat, resp);
         let src_s = resolve_str(&src, resp);
-        return Regex::new(&pat_s).map(|re| re.is_match(&src_s)).unwrap_or(false);
+        return Regex::new(&pat_s)
+            .map(|re| re.is_match(&src_s))
+            .unwrap_or(false);
     }
 
     // len(x) operator N
@@ -365,11 +416,16 @@ fn split_args(args: &str) -> (String, String) {
     let mut str_char = '"';
     for (i, c) in args.char_indices() {
         if in_str {
-            if c == str_char { in_str = false; }
+            if c == str_char {
+                in_str = false;
+            }
             continue;
         }
         match c {
-            '"' | '\'' => { in_str = true; str_char = c; }
+            '"' | '\'' => {
+                in_str = true;
+                str_char = c;
+            }
             '(' => depth += 1,
             ')' => depth -= 1,
             ',' if depth == 0 => {
@@ -432,13 +488,28 @@ fn find_op(expr: &str, op: &str) -> Option<usize> {
     while i < bytes.len() {
         let c = bytes[i];
         if in_str {
-            if c == str_char { in_str = false; }
+            if c == str_char {
+                in_str = false;
+            }
             i += 1;
             continue;
         }
-        if c == b'"' || c == b'\'' { in_str = true; str_char = c; i += 1; continue; }
-        if c == b'(' { depth += 1; i += 1; continue; }
-        if c == b')' { depth -= 1; i += 1; continue; }
+        if c == b'"' || c == b'\'' {
+            in_str = true;
+            str_char = c;
+            i += 1;
+            continue;
+        }
+        if c == b'(' {
+            depth += 1;
+            i += 1;
+            continue;
+        }
+        if c == b')' {
+            depth -= 1;
+            i += 1;
+            continue;
+        }
         if depth == 0 && bytes[i..].starts_with(op_bytes) {
             return Some(i);
         }
@@ -469,7 +540,9 @@ fn apply_cmp(lhs: i64, op: &str, rhs: i64) -> bool {
 }
 
 impl Default for MatcherEngine {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Default for Matcher {
@@ -501,22 +574,35 @@ mod tests {
 
     fn make_response(status: u16, body: &str) -> HttpResponse {
         let mut h = HashMap::new();
-        h.insert("content-type".to_string(), "text/html; charset=utf-8".to_string());
+        h.insert(
+            "content-type".to_string(),
+            "text/html; charset=utf-8".to_string(),
+        );
         h.insert("x-powered-by".to_string(), "PHP/7.4".to_string());
         HttpResponse::new(
-            status, h, body.to_string(), body.len() as u64,
-            Duration::from_millis(50), "https://example.com".to_string(),
+            status,
+            h,
+            body.to_string(),
+            body.len() as u64,
+            Duration::from_millis(50),
+            "https://example.com".to_string(),
         )
     }
 
     #[test]
     fn test_status_matcher() {
         let mut e = MatcherEngine::new();
-        let r = e.evaluate_matchers(
-            &[Matcher { matcher_type: "status".to_string(), status: Some(vec![200]), ..Default::default() }],
-            "or",
-            &make_response(200, "ok"),
-        ).unwrap();
+        let r = e
+            .evaluate_matchers(
+                &[Matcher {
+                    matcher_type: "status".to_string(),
+                    status: Some(vec![200]),
+                    ..Default::default()
+                }],
+                "or",
+                &make_response(200, "ok"),
+            )
+            .unwrap();
         assert!(r.matched);
     }
 
@@ -525,7 +611,11 @@ mod tests {
         let mut e = MatcherEngine::new();
         let resp = make_response(200, "hello");
         let matchers = vec![
-            Matcher { matcher_type: "status".to_string(), status: Some(vec![200]), ..Default::default() },
+            Matcher {
+                matcher_type: "status".to_string(),
+                status: Some(vec![200]),
+                ..Default::default()
+            },
             Matcher {
                 matcher_type: "word".to_string(),
                 words: Some(vec!["NOTHERE".to_string()]),

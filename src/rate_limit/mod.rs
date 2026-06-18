@@ -61,7 +61,7 @@ impl RateLimiter {
     /// Create a rate limiter with a fixed delay between requests
     pub fn with_delay(delay: Duration) -> Self {
         Self {
-            max_requests: u32::MAX, // No limit on number of requests
+            max_requests: u32::MAX,                     // No limit on number of requests
             window_duration: Duration::from_secs(3600), // 1 hour window (effectively unlimited)
             request_times: Vec::new(),
             min_delay: delay,
@@ -146,17 +146,27 @@ impl RateLimiter {
         Duration::ZERO
     }
 
-    /// Remove request times that are outside the current window
+    /// Remove request times that are outside the current window.
+    /// Uses checked_sub to avoid overflow when the window is larger than the
+    /// process uptime (common on Windows where Instant starts near zero).
     fn cleanup_old_requests(&mut self, now: Instant) {
-        let cutoff = now - self.window_duration;
-        self.request_times.retain(|&time| time > cutoff);
+        if let Some(cutoff) = now.checked_sub(self.window_duration) {
+            self.request_times.retain(|&time| time > cutoff);
+        }
+        // else: window extends before process start — all recorded times are valid, keep them
     }
 
     /// Get current rate statistics
     pub fn stats(&self) -> RateLimiterStats {
         let now = Instant::now();
-        let cutoff = now - self.window_duration;
-        let current_requests = self.request_times.iter().filter(|&&time| time > cutoff).count();
+        let current_requests = if let Some(cutoff) = now.checked_sub(self.window_duration) {
+            self.request_times
+                .iter()
+                .filter(|&&time| time > cutoff)
+                .count()
+        } else {
+            self.request_times.len()
+        };
 
         RateLimiterStats {
             requests_in_window: current_requests as u32,
@@ -233,7 +243,7 @@ mod tests {
     fn test_rate_limiter_creation() {
         let limiter = RateLimiter::per_second(1.0);
         assert_eq!(limiter.max_requests, 60); // 1 req/sec = 60 req/min
-        
+
         let limiter = RateLimiter::per_minute(30, Duration::from_millis(100));
         assert_eq!(limiter.max_requests, 30);
     }
@@ -241,13 +251,13 @@ mod tests {
     #[test]
     fn test_min_delay_enforcement() {
         let mut limiter = RateLimiter::with_delay(Duration::from_millis(100));
-        
+
         let start = Instant::now();
         limiter.wait_if_needed(); // First request - no wait
-        
+
         let first_elapsed = start.elapsed();
         assert!(first_elapsed < Duration::from_millis(50)); // Should be immediate
-        
+
         limiter.wait_if_needed(); // Second request - should wait
         let second_elapsed = start.elapsed();
         assert!(second_elapsed >= Duration::from_millis(100)); // Should have waited
@@ -256,15 +266,15 @@ mod tests {
     #[test]
     fn test_can_make_request() {
         let mut limiter = RateLimiter::per_minute(2, Duration::from_millis(100));
-        
+
         assert!(limiter.can_make_request());
         limiter.wait_if_needed();
-        
+
         // After minimum delay, should be able to make another request
         std::thread::sleep(Duration::from_millis(150));
         assert!(limiter.can_make_request());
         limiter.wait_if_needed();
-        
+
         // Now we've made 2 requests in the window, should not be able to make another immediately
         // Note: This test might be flaky due to timing, but demonstrates the concept
     }
@@ -272,13 +282,13 @@ mod tests {
     #[test]
     fn test_stats() {
         let mut limiter = RateLimiter::per_minute(10, Duration::from_millis(50));
-        
+
         let stats = limiter.stats();
         assert_eq!(stats.requests_in_window, 0);
         assert_eq!(stats.max_requests, 10);
         assert!(stats.can_make_request);
         assert_eq!(stats.requests_remaining(), 10);
-        
+
         limiter.wait_if_needed();
         let stats = limiter.stats();
         assert_eq!(stats.requests_in_window, 1);
@@ -288,13 +298,12 @@ mod tests {
     #[test]
     fn test_reset() {
         let mut limiter = RateLimiter::per_minute(1, Duration::from_millis(50));
-        
+
         limiter.wait_if_needed();
         assert_eq!(limiter.stats().requests_in_window, 1);
-        
+
         limiter.reset();
         assert_eq!(limiter.stats().requests_in_window, 0);
         assert!(limiter.can_make_request());
     }
 }
-

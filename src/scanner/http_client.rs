@@ -54,7 +54,11 @@ impl HttpClient {
             .build()
             .context("Failed to create no-redirect HTTP client with timeout")?;
 
-        Ok(Self { client_follow, client_no_follow, user_agent: ua })
+        Ok(Self {
+            client_follow,
+            client_no_follow,
+            user_agent: ua,
+        })
     }
 
     pub fn with_user_agent(mut self, ua: String) -> Self {
@@ -103,10 +107,21 @@ impl HttpClient {
         let body = String::from_utf8_lossy(&body_bytes).into_owned();
         let content_length = body.len() as u64;
 
-        Ok(HttpResponse::new(status, headers, body, content_length, elapsed, final_url))
+        Ok(HttpResponse::new(
+            status,
+            headers,
+            body,
+            content_length,
+            elapsed,
+            final_url,
+        ))
     }
 
-    pub fn execute_with_retries(&self, request: &ScanRequest, max_retries: u32) -> Result<HttpResponse> {
+    pub fn execute_with_retries(
+        &self,
+        request: &ScanRequest,
+        max_retries: u32,
+    ) -> Result<HttpResponse> {
         let mut last_err = None;
         for attempt in 0..=max_retries {
             match self.execute(request) {

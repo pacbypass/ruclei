@@ -79,7 +79,8 @@ impl TemplateCache {
     }
 
     fn cache_path(&self, fingerprint: &str) -> PathBuf {
-        self.cache_dir.join(format!("templates-{}.json", fingerprint))
+        self.cache_dir
+            .join(format!("templates-{}.json", fingerprint))
     }
 
     /// Remove all cache files (e.g. on --clear-cache).

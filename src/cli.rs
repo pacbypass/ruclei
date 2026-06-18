@@ -106,14 +106,14 @@ pub fn build_cli() -> Command {
                 .long("target")
                 .value_name("URL")
                 .help("Target URL to scan")
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("list")
                 .short('l')
                 .long("list")
                 .value_name("FILE")
-                .help("File containing list of target URLs")
+                .help("File containing list of target URLs"),
         )
         .arg(
             Arg::new("templates")
@@ -121,14 +121,14 @@ pub fn build_cli() -> Command {
                 .long("templates")
                 .value_name("PATH")
                 .help("Template file or directory")
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("output")
                 .short('o')
                 .long("output")
                 .value_name("FILE")
-                .help("Output file to write results")
+                .help("Output file to write results"),
         )
         .arg(
             Arg::new("format")
@@ -137,7 +137,7 @@ pub fn build_cli() -> Command {
                 .value_name("FORMAT")
                 .help("Output format")
                 .value_parser(["text", "json", "yaml"])
-                .default_value("text")
+                .default_value("text"),
         )
         .arg(
             Arg::new("rate-limit")
@@ -146,7 +146,7 @@ pub fn build_cli() -> Command {
                 .value_name("RPS")
                 .help("Rate limit in requests per second")
                 .value_parser(clap::value_parser!(f64))
-                .default_value("10.0")
+                .default_value("10.0"),
         )
         .arg(
             Arg::new("delay")
@@ -154,7 +154,7 @@ pub fn build_cli() -> Command {
                 .long("delay")
                 .value_name("MS")
                 .help("Delay between requests in milliseconds")
-                .value_parser(clap::value_parser!(u64))
+                .value_parser(clap::value_parser!(u64)),
         )
         .arg(
             Arg::new("timeout")
@@ -162,7 +162,7 @@ pub fn build_cli() -> Command {
                 .value_name("SECONDS")
                 .help("HTTP timeout in seconds")
                 .value_parser(clap::value_parser!(u64))
-                .default_value("30")
+                .default_value("30"),
         )
         .arg(
             Arg::new("max-redirects")
@@ -170,14 +170,14 @@ pub fn build_cli() -> Command {
                 .value_name("NUM")
                 .help("Maximum redirects to follow")
                 .value_parser(clap::value_parser!(u32))
-                .default_value("3")
+                .default_value("3"),
         )
         .arg(
             Arg::new("user-agent")
                 .long("user-agent")
                 .value_name("STRING")
                 .help("User agent string")
-                .default_value("ruclei/1.0")
+                .default_value("ruclei/1.0"),
         )
         .arg(
             Arg::new("header")
@@ -185,27 +185,27 @@ pub fn build_cli() -> Command {
                 .long("header")
                 .value_name("HEADER")
                 .help("Custom header (format: 'Name: Value')")
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("proxy")
                 .long("proxy")
                 .value_name("URL")
-                .help("Proxy URL")
+                .help("Proxy URL"),
         )
         .arg(
             Arg::new("verbose")
                 .short('v')
                 .long("verbose")
                 .help("Verbose output")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("silent")
                 .short('s')
                 .long("silent")
                 .help("Silent mode (only show matches)")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("max-cache-size")
@@ -213,7 +213,7 @@ pub fn build_cli() -> Command {
                 .value_name("NUM")
                 .help("Maximum number of cached requests")
                 .value_parser(clap::value_parser!(usize))
-                .default_value("1000")
+                .default_value("1000"),
         )
         .arg(
             Arg::new("severity")
@@ -221,7 +221,7 @@ pub fn build_cli() -> Command {
                 .value_name("LEVEL")
                 .help("Filter by severity (info,low,medium,high,critical)")
                 .value_delimiter(',')
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("tags")
@@ -229,7 +229,7 @@ pub fn build_cli() -> Command {
                 .value_name("TAG")
                 .help("Filter by tags")
                 .value_delimiter(',')
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("include-templates")
@@ -237,7 +237,7 @@ pub fn build_cli() -> Command {
                 .value_name("ID")
                 .help("Include specific template IDs")
                 .value_delimiter(',')
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("exclude-templates")
@@ -245,7 +245,7 @@ pub fn build_cli() -> Command {
                 .value_name("ID")
                 .help("Exclude specific template IDs")
                 .value_delimiter(',')
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("max-retries")
@@ -253,13 +253,13 @@ pub fn build_cli() -> Command {
                 .value_name("NUM")
                 .help("Maximum retries for failed requests")
                 .value_parser(clap::value_parser!(u32))
-                .default_value("3")
+                .default_value("3"),
         )
         .arg(
             Arg::new("stats")
                 .long("stats")
                 .help("Show scan statistics")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("concurrency")
@@ -268,31 +268,31 @@ pub fn build_cli() -> Command {
                 .value_name("NUM")
                 .help("Maximum number of concurrent templates [default: 25]")
                 .value_parser(clap::value_parser!(usize))
-                .default_value("25")
+                .default_value("25"),
         )
         .arg(
             Arg::new("no-color")
                 .long("no-color")
                 .help("Disable colored output")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("no-cache")
                 .long("no-cache")
                 .help("Disable template disk cache (always parse from YAML)")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("clear-cache")
                 .long("clear-cache")
                 .help("Clear the template disk cache and exit")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("dry-run")
                 .long("dry-run")
                 .help("Load templates and print count, then exit without scanning")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
 }
 
@@ -320,7 +320,9 @@ pub fn parse_args() -> anyhow::Result<Config> {
     let clear_cache = matches.get_flag("clear-cache");
     let dry_run = matches.get_flag("dry-run");
     if config.targets.is_empty() && !clear_cache && !dry_run {
-        return Err(anyhow::anyhow!("No targets specified. Use -u/--target or -l/--list"));
+        return Err(anyhow::anyhow!(
+            "No targets specified. Use -u/--target or -l/--list"
+        ));
     }
 
     // Parse templates
@@ -452,7 +454,10 @@ impl Config {
     /// Check if a template should be included based on filters
     pub fn should_include_template(&self, template: &crate::template::Template) -> bool {
         if let Some(sev_filter) = &self.severity_filter {
-            if !sev_filter.iter().any(|s| s.eq_ignore_ascii_case(&template.info.severity)) {
+            if !sev_filter
+                .iter()
+                .any(|s| s.eq_ignore_ascii_case(&template.info.severity))
+            {
                 return false;
             }
         }
@@ -463,7 +468,9 @@ impl Config {
                 return false;
             }
             let has_match = tag_filter.iter().any(|ft| {
-                template_tags.iter().any(|tt| tt.to_lowercase().contains(&ft.to_lowercase()))
+                template_tags
+                    .iter()
+                    .any(|tt| tt.to_lowercase().contains(&ft.to_lowercase()))
             });
             if !has_match {
                 return false;
@@ -500,4 +507,3 @@ impl Config {
         self.silent
     }
 }
-

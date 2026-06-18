@@ -64,16 +64,20 @@ impl RequestCluster {
     /// Store a response in the cache
     pub fn cache_response(&mut self, request: &ScanRequest, response: HttpResponse) {
         let key = request.cluster_key();
-        
+
         if !self.cache.contains_key(&key) {
             self.stats.unique_requests += 1;
         }
-        
+
         self.cache.insert(key, response);
     }
 
     /// Get or execute a request, using cache when possible
-    pub fn get_or_execute<F>(&mut self, request: &ScanRequest, executor: F) -> anyhow::Result<HttpResponse>
+    pub fn get_or_execute<F>(
+        &mut self,
+        request: &ScanRequest,
+        executor: F,
+    ) -> anyhow::Result<HttpResponse>
     where
         F: FnOnce(&ScanRequest) -> anyhow::Result<HttpResponse>,
     {
@@ -83,10 +87,10 @@ impl RequestCluster {
 
         // Execute the request
         let response = executor(request)?;
-        
+
         // Cache the response
         self.cache_response(request, response.clone());
-        
+
         Ok(response)
     }
 
@@ -111,7 +115,8 @@ impl RequestCluster {
     /// to use a proper LRU cache with timestamps
     pub fn cleanup(&mut self, max_entries: usize) {
         if self.cache.len() > max_entries {
-            let keys_to_remove: Vec<String> = self.cache
+            let keys_to_remove: Vec<String> = self
+                .cache
                 .keys()
                 .take(self.cache.len() - max_entries)
                 .cloned()
@@ -194,7 +199,7 @@ mod tests {
         let _cached = cluster.get_cached_response(&request);
         assert_eq!(cluster.stats().cache_hits, 1);
         assert_eq!(cluster.stats().cache_misses, 1);
-        
+
         // Hit rate should be 50%
         assert_eq!(cluster.stats().hit_rate(), 0.5);
     }
@@ -217,10 +222,12 @@ mod tests {
         assert_eq!(response1.status, expected_response.status);
 
         // Second call should use cache
-        let response2 = cluster.get_or_execute(&request, |_| {
-            call_count += 1;
-            Ok(create_test_response())
-        }).unwrap();
+        let response2 = cluster
+            .get_or_execute(&request, |_| {
+                call_count += 1;
+                Ok(create_test_response())
+            })
+            .unwrap();
         assert_eq!(call_count, 1); // Should not increment
         assert_eq!(response2.status, expected_response.status);
     }
@@ -235,4 +242,3 @@ mod tests {
         assert!(!RequestCluster::would_cluster(&req1, &req3));
     }
 }
-

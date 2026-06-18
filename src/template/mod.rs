@@ -1,5 +1,5 @@
-use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 

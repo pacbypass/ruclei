@@ -1,5 +1,5 @@
-use colored::*;
 use chrono::Local;
+use colored::*;
 use std::io::{self, Write};
 
 const VERSION: &str = "0.2.0";

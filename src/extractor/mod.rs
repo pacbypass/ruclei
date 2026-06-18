@@ -45,14 +45,19 @@ impl ExtractorEngine {
     }
 
     /// Extract data using all extractors
-    pub fn extract_all(&mut self, extractors: &[Extractor], response: &HttpResponse) -> Result<HashMap<String, Vec<String>>> {
+    pub fn extract_all(
+        &mut self,
+        extractors: &[Extractor],
+        response: &HttpResponse,
+    ) -> Result<HashMap<String, Vec<String>>> {
         let mut results = HashMap::new();
 
         for extractor in extractors {
             let extraction_result = self.extract_single(extractor, response)?;
-            
+
             if extraction_result.has_values() {
-                let key = extraction_result.extractor_name
+                let key = extraction_result
+                    .extractor_name
                     .unwrap_or_else(|| format!("extractor_{}", results.len()));
                 results.insert(key, extraction_result.extracted_values);
             }
@@ -62,7 +67,11 @@ impl ExtractorEngine {
     }
 
     /// Extract data using a single extractor
-    pub fn extract_single(&mut self, extractor: &Extractor, response: &HttpResponse) -> Result<ExtractionResult> {
+    pub fn extract_single(
+        &mut self,
+        extractor: &Extractor,
+        response: &HttpResponse,
+    ) -> Result<ExtractionResult> {
         match extractor.extractor_type.as_str() {
             "regex" => self.extract_regex(extractor, response),
             "kval" => self.extract_kval(extractor, response),
@@ -77,14 +86,18 @@ impl ExtractorEngine {
     }
 
     /// Extract using regex patterns
-    fn extract_regex(&mut self, extractor: &Extractor, response: &HttpResponse) -> Result<ExtractionResult> {
+    fn extract_regex(
+        &mut self,
+        extractor: &Extractor,
+        response: &HttpResponse,
+    ) -> Result<ExtractionResult> {
         if let Some(patterns) = &extractor.regex {
             let search_text = self.get_search_text(extractor, response);
             let mut extracted_values = Vec::new();
 
             for pattern in patterns {
                 let regex = self.get_or_compile_regex(pattern)?;
-                
+
                 // Extract all matches
                 for captures in regex.captures_iter(&search_text) {
                     // If group is specified, extract that specific group
@@ -111,14 +124,21 @@ impl ExtractorEngine {
                 }
             }
 
-            Ok(ExtractionResult::new(extractor.name.clone(), extracted_values))
+            Ok(ExtractionResult::new(
+                extractor.name.clone(),
+                extracted_values,
+            ))
         } else {
             Err(anyhow::anyhow!("Regex extractor missing patterns"))
         }
     }
 
     /// Extract key-value pairs from headers or response
-    fn extract_kval(&self, extractor: &Extractor, response: &HttpResponse) -> Result<ExtractionResult> {
+    fn extract_kval(
+        &self,
+        extractor: &Extractor,
+        response: &HttpResponse,
+    ) -> Result<ExtractionResult> {
         if let Some(keys) = &extractor.kval {
             let mut extracted_values = Vec::new();
 
@@ -140,19 +160,30 @@ impl ExtractorEngine {
                 }
             }
 
-            Ok(ExtractionResult::new(extractor.name.clone(), extracted_values))
+            Ok(ExtractionResult::new(
+                extractor.name.clone(),
+                extracted_values,
+            ))
         } else {
             Err(anyhow::anyhow!("Kval extractor missing keys"))
         }
     }
 
     /// XPath extraction is not yet implemented; returns empty result silently
-    fn extract_xpath(&self, extractor: &Extractor, _response: &HttpResponse) -> Result<ExtractionResult> {
+    fn extract_xpath(
+        &self,
+        extractor: &Extractor,
+        _response: &HttpResponse,
+    ) -> Result<ExtractionResult> {
         Ok(ExtractionResult::empty(extractor.name.clone()))
     }
 
     /// Extract using JSON path expressions
-    fn extract_json(&self, extractor: &Extractor, response: &HttpResponse) -> Result<ExtractionResult> {
+    fn extract_json(
+        &self,
+        extractor: &Extractor,
+        response: &HttpResponse,
+    ) -> Result<ExtractionResult> {
         if let Some(json_paths) = &extractor.json {
             let mut extracted_values = Vec::new();
             let search_text = self.get_search_text(extractor, response);
@@ -166,14 +197,21 @@ impl ExtractorEngine {
                 }
             }
 
-            Ok(ExtractionResult::new(extractor.name.clone(), extracted_values))
+            Ok(ExtractionResult::new(
+                extractor.name.clone(),
+                extracted_values,
+            ))
         } else {
             Err(anyhow::anyhow!("JSON extractor missing paths"))
         }
     }
 
     /// Extract using DSL expressions
-    fn extract_dsl(&self, extractor: &Extractor, response: &HttpResponse) -> Result<ExtractionResult> {
+    fn extract_dsl(
+        &self,
+        extractor: &Extractor,
+        response: &HttpResponse,
+    ) -> Result<ExtractionResult> {
         if let Some(expressions) = &extractor.dsl {
             let mut extracted_values = Vec::new();
 
@@ -183,7 +221,10 @@ impl ExtractorEngine {
                 }
             }
 
-            Ok(ExtractionResult::new(extractor.name.clone(), extracted_values))
+            Ok(ExtractionResult::new(
+                extractor.name.clone(),
+                extracted_values,
+            ))
         } else {
             Err(anyhow::anyhow!("DSL extractor missing expressions"))
         }
@@ -206,11 +247,12 @@ impl ExtractorEngine {
                 Regex::new(&format!("(?i){}", case_insensitive))
             } else {
                 Regex::new(pattern)
-            }.with_context(|| format!("Failed to compile regex pattern: {}", pattern))?;
-            
+            }
+            .with_context(|| format!("Failed to compile regex pattern: {}", pattern))?;
+
             self.regex_cache.insert(pattern.to_string(), regex);
         }
-        
+
         Ok(self.regex_cache.get(pattern).unwrap())
     }
 
@@ -218,7 +260,7 @@ impl ExtractorEngine {
     fn extract_key_value(&self, text: &str, key: &str) -> Option<String> {
         for line in text.lines() {
             let line = line.trim();
-            
+
             // Try different formats: key=value, key:value, key value
             for separator in &["=", ":", " "] {
                 if let Some(pos) = line.find(&format!("{}{}", key, separator)) {
@@ -241,14 +283,14 @@ impl ExtractorEngine {
     fn extract_json_path(&self, json: &serde_json::Value, path: &str) -> Option<String> {
         // This is a very simplified JSON path implementation
         // A real implementation would use a proper JSONPath library
-        
+
         let parts: Vec<&str> = path.split('.').collect();
         let mut current = json;
 
         for part in parts {
             // Remove array notation for now
             let clean_part = part.split('[').next().unwrap_or(part);
-            
+
             match current {
                 serde_json::Value::Object(obj) => {
                     if let Some(value) = obj.get(clean_part) {
@@ -293,21 +335,25 @@ impl ExtractorEngine {
     }
 
     /// Evaluate DSL expression for extraction
-    fn evaluate_dsl_extraction(&self, expr: &str, response: &HttpResponse) -> Result<Option<String>> {
+    fn evaluate_dsl_extraction(
+        &self,
+        expr: &str,
+        response: &HttpResponse,
+    ) -> Result<Option<String>> {
         // Simplified DSL evaluator for extraction
-        
+
         if expr == "status_code" {
             return Ok(Some(response.status.to_string()));
         }
-        
+
         if expr == "content_length" {
             return Ok(Some(response.content_length.to_string()));
         }
-        
+
         if expr == "body" {
             return Ok(Some(response.body.clone()));
         }
-        
+
         if expr.starts_with("header[") && expr.ends_with("]") {
             let header_name = &expr[7..expr.len() - 1]; // Remove "header[" and "]"
             if let Some(value) = response.get_header(header_name) {
@@ -347,7 +393,7 @@ mod tests {
         let mut headers = HashMap::new();
         headers.insert("Content-Type".to_string(), "application/json".to_string());
         headers.insert("X-Custom-Header".to_string(), "custom-value".to_string());
-        
+
         HttpResponse::new(
             200,
             headers,
@@ -362,7 +408,7 @@ mod tests {
     fn test_regex_extraction() {
         let mut engine = ExtractorEngine::new();
         let response = create_test_response("Version: 1.2.3, Build: 456");
-        
+
         let extractor = Extractor {
             extractor_type: "regex".to_string(),
             name: Some("version".to_string()),
@@ -379,7 +425,7 @@ mod tests {
     fn test_kval_header_extraction() {
         let mut engine = ExtractorEngine::new();
         let response = create_test_response("test body");
-        
+
         let extractor = Extractor {
             extractor_type: "kval".to_string(),
             name: Some("custom_header".to_string()),
@@ -398,7 +444,7 @@ mod tests {
         let mut engine = ExtractorEngine::new();
         let json_body = r#"{"user": {"name": "John", "age": 30}, "status": "active"}"#;
         let response = create_test_response(json_body);
-        
+
         let extractor = Extractor {
             extractor_type: "json".to_string(),
             name: Some("username".to_string()),
@@ -415,7 +461,7 @@ mod tests {
     fn test_dsl_extraction() {
         let mut engine = ExtractorEngine::new();
         let response = create_test_response("test body");
-        
+
         let extractor = Extractor {
             extractor_type: "dsl".to_string(),
             name: Some("status".to_string()),
@@ -428,5 +474,3 @@ mod tests {
         assert_eq!(result.extracted_values, vec!["200"]);
     }
 }
-
-

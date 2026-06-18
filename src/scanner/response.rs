@@ -117,4 +117,3 @@ impl HttpResponse {
         self.body.lines().count()
     }
 }
-

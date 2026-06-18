@@ -48,8 +48,8 @@ impl TemplateParser {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let template: Template = serde_yaml::from_str(&yaml_content)
-            .context("Failed to deserialize YAML template")?;
+        let template: Template =
+            serde_yaml::from_str(&yaml_content).context("Failed to deserialize YAML template")?;
 
         self.validate_template(&template)?;
         Ok(template)
@@ -84,10 +84,7 @@ impl TemplateParser {
         let entries = fs::read_dir(dir)
             .with_context(|| format!("Failed to read directory: {}", dir.display()))?;
 
-        let mut paths: Vec<_> = entries
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .collect();
+        let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
         paths.sort();
 
         for path in paths {

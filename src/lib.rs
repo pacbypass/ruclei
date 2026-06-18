@@ -1,12 +1,12 @@
 pub mod cli;
-pub mod template;
-pub mod scanner;
-pub mod matcher;
-pub mod extractor;
 pub mod cluster;
-pub mod rate_limit;
+pub mod extractor;
+pub mod matcher;
 pub mod output;
+pub mod rate_limit;
 pub mod raw_request;
+pub mod scanner;
+pub mod template;
 
 use anyhow::{Context, Result};
 use rayon::prelude::*;
@@ -23,7 +23,7 @@ use extractor::ExtractorEngine;
 use matcher::MatcherEngine;
 use rate_limit::RateLimiter;
 use scanner::{HttpClient, ScanRequest, ScanResult};
-use template::{Template, parser::TemplateParser};
+use template::{parser::TemplateParser, Template};
 
 // ─── Atomic scan statistics ───────────────────────────────────────────────────
 
@@ -63,16 +63,27 @@ pub struct ScanStats {
 
 impl ScanStats {
     pub fn success_rate(&self) -> f64 {
-        if self.total_requests == 0 { 0.0 }
-        else { self.successful_requests as f64 / self.total_requests as f64 * 100.0 }
+        if self.total_requests == 0 {
+            0.0
+        } else {
+            self.successful_requests as f64 / self.total_requests as f64 * 100.0
+        }
     }
     pub fn cache_hit_rate(&self) -> f64 {
         let t = self.cache_hits + self.cache_misses;
-        if t == 0 { 0.0 } else { self.cache_hits as f64 / t as f64 * 100.0 }
+        if t == 0 {
+            0.0
+        } else {
+            self.cache_hits as f64 / t as f64 * 100.0
+        }
     }
     pub fn rps(&self) -> f64 {
         let s = self.duration.as_secs_f64();
-        if s == 0.0 { 0.0 } else { self.total_requests as f64 / s }
+        if s == 0.0 {
+            0.0
+        } else {
+            self.total_requests as f64 / s
+        }
     }
 }
 
@@ -131,7 +142,8 @@ impl RucleiScanner {
         if !self.config.is_silent() {
             output::log_info(&format!(
                 "Loading templates from: {}",
-                self.config.templates
+                self.config
+                    .templates
                     .iter()
                     .map(|p| p.display().to_string())
                     .collect::<Vec<_>>()
@@ -199,10 +211,14 @@ impl RucleiScanner {
         let max_cache = config.max_cache_size;
 
         // Build all (target, template) pairs for parallel execution
-        let work_items: Vec<(String, Template)> = self.config.targets
+        let work_items: Vec<(String, Template)> = self
+            .config
+            .targets
             .iter()
             .flat_map(|target| {
-                self.templates.iter().map(move |t| (target.clone(), t.clone()))
+                self.templates
+                    .iter()
+                    .map(move |t| (target.clone(), t.clone()))
             })
             .collect();
 
@@ -247,9 +263,7 @@ impl RucleiScanner {
                     }
                     Err(e) => {
                         if cfg.is_verbose() {
-                            output::log_debug(&format!(
-                                "Template {} failed: {}", template.id, e
-                            ));
+                            output::log_debug(&format!("Template {} failed: {}", template.id, e));
                         }
                         vec![]
                     }
@@ -285,7 +299,10 @@ impl RucleiScanner {
         output::log_info(&format!("Failed:              {}", s.failed_requests));
         output::log_info(&format!("Matches found:       {}", s.matches_found));
         output::log_info(&format!("Cache hit rate:      {:.1}%", s.cache_hit_rate()));
-        output::log_info(&format!("Duration:            {:.2}s", s.duration.as_secs_f64()));
+        output::log_info(&format!(
+            "Duration:            {:.2}s",
+            s.duration.as_secs_f64()
+        ));
         if s.duration.as_secs_f64() > 0.0 {
             output::log_info(&format!("Avg RPS:             {:.1}", s.rps()));
         }
@@ -329,7 +346,14 @@ fn execute_template(
     target: &str,
     ctx: &ExecCtx<'_>,
 ) -> Result<Vec<ScanResult>> {
-    let ExecCtx { http_client, cluster, rate_limiter, stats, config, max_cache } = ctx;
+    let ExecCtx {
+        http_client,
+        cluster,
+        rate_limiter,
+        stats,
+        config,
+        max_cache,
+    } = ctx;
     let mut matcher_engine = MatcherEngine::new();
     let mut extractor_engine = ExtractorEngine::new();
 
@@ -338,19 +362,28 @@ fn execute_template(
     let mut results = Vec::new();
 
     for request in template.get_http_requests() {
-        let matchers_condition = request.matchers_condition.as_deref().unwrap_or("or").to_string();
+        let matchers_condition = request
+            .matchers_condition
+            .as_deref()
+            .unwrap_or("or")
+            .to_string();
 
         // Build list of (url, scan_request) from paths or raw requests
         let scan_requests: Vec<ScanRequest> = if !request.path.is_empty() {
-            request.path.iter()
+            request
+                .path
+                .iter()
                 .filter_map(|p| resolve_path(p, &base_url, &vars).ok())
                 .map(|url| build_scan_request(&url, request, config))
                 .filter_map(|r| r.ok())
                 .collect()
         } else if !request.raw_request.is_empty() {
-            request.raw_request.iter()
+            request
+                .raw_request
+                .iter()
                 .filter_map(|raw| {
-                    raw_request::parse_raw_request(raw, &base_url, &vars).ok()
+                    raw_request::parse_raw_request(raw, &base_url, &vars)
+                        .ok()
                         .map(|req| apply_config_headers(req, request, config))
                 })
                 .collect()
@@ -398,7 +431,8 @@ fn execute_template(
                             stats.failed_requests.fetch_add(1, Ordering::Relaxed);
                             if config.is_verbose() {
                                 output::log_debug(&format!(
-                                    "Request failed [{}]: {}", scan_req.url, e
+                                    "Request failed [{}]: {}",
+                                    scan_req.url, e
                                 ));
                             }
                             continue;
@@ -411,7 +445,11 @@ fn execute_template(
 
             // Evaluate matchers
             if let Some(matchers) = &request.matchers {
-                match matcher_engine.evaluate_matchers(matchers, &matchers_condition, &scan_result.response) {
+                match matcher_engine.evaluate_matchers(
+                    matchers,
+                    &matchers_condition,
+                    &scan_result.response,
+                ) {
                     Ok(mr) if mr.matched => {
                         scan_result = scan_result.with_match(mr.matcher_name);
                     }
@@ -429,10 +467,15 @@ fn execute_template(
             if run_extractors {
                 if let Some(extractors) = &request.extractors {
                     match extractor_engine.extract_all(extractors, &scan_result.response) {
-                        Ok(data) => { scan_result = scan_result.with_extracted_data(data); }
+                        Ok(data) => {
+                            scan_result = scan_result.with_extracted_data(data);
+                        }
                         Err(e) => {
                             if config.is_verbose() {
-                                output::log_debug(&format!("Extractor error [{}]: {}", template.id, e));
+                                output::log_debug(&format!(
+                                    "Extractor error [{}]: {}",
+                                    template.id, e
+                                ));
                             }
                         }
                     }
@@ -478,7 +521,11 @@ fn resolve_path(path: &str, base_url: &str, vars: &HashMap<String, String>) -> R
     }
 }
 
-fn build_scan_request(url: &str, request: &template::Request, config: &Config) -> Result<ScanRequest> {
+fn build_scan_request(
+    url: &str,
+    request: &template::Request,
+    config: &Config,
+) -> Result<ScanRequest> {
     let method = request.method.as_deref().unwrap_or("GET").to_string();
     let mut headers: HashMap<String, String> = HashMap::new();
     for (k, v) in &config.headers {
@@ -504,7 +551,11 @@ fn build_scan_request(url: &str, request: &template::Request, config: &Config) -
 }
 
 /// Apply config-level headers to a raw-parsed request (without overwriting raw headers)
-fn apply_config_headers(mut req: ScanRequest, request: &template::Request, config: &Config) -> ScanRequest {
+fn apply_config_headers(
+    mut req: ScanRequest,
+    request: &template::Request,
+    config: &Config,
+) -> ScanRequest {
     for (k, v) in &config.headers {
         req.headers.entry(k.clone()).or_insert_with(|| v.clone());
     }
@@ -518,7 +569,8 @@ fn apply_config_headers(mut req: ScanRequest, request: &template::Request, confi
 // ─── Output formatters ────────────────────────────────────────────────────────
 
 fn format_json(results: Vec<&ScanResult>, templates: &[Template]) -> Result<String> {
-    let items: Vec<serde_json::Value> = results.iter()
+    let items: Vec<serde_json::Value> = results
+        .iter()
         .map(|r| {
             let t = templates.iter().find(|t| t.id == r.template_id);
             serde_json::json!({
@@ -544,7 +596,8 @@ fn format_text(results: Vec<&ScanResult>, templates: &[Template]) -> String {
         let t = templates.iter().find(|t| t.id == r.template_id);
         out.push_str(&format!(
             "[{}] [{}] {} [{}]\n",
-            t.map(|t| t.info.severity.to_uppercase()).unwrap_or_default(),
+            t.map(|t| t.info.severity.to_uppercase())
+                .unwrap_or_default(),
             r.template_id,
             t.map(|t| t.info.name.as_str()).unwrap_or(""),
             r.request.url,
@@ -571,8 +624,7 @@ pub struct TemplateVars {
 
 impl TemplateVars {
     pub fn from_url(url: &str) -> Result<Self> {
-        let parsed = Url::parse(url)
-            .with_context(|| format!("Invalid target URL: {}", url))?;
+        let parsed = Url::parse(url).with_context(|| format!("Invalid target URL: {}", url))?;
 
         let scheme = parsed.scheme().to_string();
         let host = parsed.host_str().unwrap_or("").to_string();
