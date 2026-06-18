@@ -1,0 +1,77 @@
+id: advanced-matching
+info:
+  name: Advanced Matching Demo
+  author: [ruclei]
+  severity: low
+  description: Demonstrates advanced matching capabilities
+  tags: [demo, matching, advanced]
+
+requests:
+  - method: GET
+    path:
+      - "/"
+    
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+        name: "status-ok"
+      
+      - type: size
+        size:
+          - 1000
+          - 5000
+          - 10000
+        name: "reasonable-size"
+      
+      - type: word
+        words:
+          - "html"
+          - "body"
+          - "head"
+        part: body
+        case-insensitive: true
+        name: "html-content"
+    
+    extractors:
+      - type: regex
+        name: "meta-tags"
+        regex:
+          - '<meta\s+name="([^"]+)"\s+content="([^"]+)"'
+        part: body
+        group: 1
+      
+      - type: regex
+        name: "links"
+        regex:
+          - '<a\s+href="([^"]+)"'
+        part: body
+        group: 1
+
+  - method: GET
+    path:
+      - "/json"
+      - "/get"
+    
+    matchers:
+      - type: word
+        words:
+          - "application/json"
+        part: header
+        name: "json-content-type"
+      
+      - type: regex
+        regex:
+          - '^\s*\{'
+        part: body
+        name: "json-start"
+    
+    extractors:
+      - type: json
+        name: "json-fields"
+        json:
+          - "headers.Host"
+          - "url"
+          - "origin"
+        part: body

@@ -1,0 +1,30 @@
+id: http-get-test
+info:
+  name: Basic HTTP GET Test
+  author: [ruclei]
+  severity: info
+  description: A simple HTTP GET test template
+  tags: [test, http]
+
+requests:
+  - method: GET
+    path:
+      - "/"
+      - "/robots.txt"
+      - "/sitemap.xml"
+    
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 404
+        name: "http-response"
+    
+    extractors:
+      - type: regex
+        name: "title"
+        regex:
+          - '<title>([^<]+)</title>'
+        part: body
+        group: 1
+

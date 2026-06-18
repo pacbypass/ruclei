@@ -1,0 +1,34 @@
+id: server-header-detection
+
+info:
+  name: Server Header Detection
+  author: [ruclei]
+  severity: info
+  description: Extract server information from HTTP headers
+  tags: [fingerprint, headers]
+
+requests:
+  - method: HEAD
+    path:
+      - "/"
+    
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 301
+          - 302
+          - 404
+        name: "any-response"
+    
+    extractors:
+      - type: kval
+        name: "server"
+        kval:
+          - "Server"
+        part: header
+      - type: kval
+        name: "x-powered-by"
+        kval:
+          - "X-Powered-By"
+        part: header

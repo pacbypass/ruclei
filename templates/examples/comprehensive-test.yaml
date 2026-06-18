@@ -1,0 +1,96 @@
+id: comprehensive-test
+info:
+  name: Comprehensive Feature Test
+  author: [ruclei]
+  severity: medium
+  description: A comprehensive template demonstrating various features
+  tags: [test, comprehensive, demo]
+  reference:
+    - https://example.com/reference
+  classification:
+    cvss-score: 5.0
+
+requests:
+  - method: GET
+    path:
+      - "/"
+      - "/api/status"
+    
+    headers:
+      X-Test-Header: "ruclei-test"
+    
+    matchers-condition: or
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 201
+          - 202
+        name: "success-status"
+      
+      - type: word
+        words:
+          - "success"
+          - "ok"
+          - "healthy"
+        part: body
+        case-insensitive: true
+        name: "success-words"
+      
+      - type: regex
+        regex:
+          - '"status":\s*"(ok|success|healthy)"'
+        part: body
+        name: "json-status"
+    
+    extractors:
+      - type: regex
+        name: "version"
+        regex:
+          - '"version":\s*"([^"]+)"'
+          - 'Version:\s*([^\s\n]+)'
+        part: body
+        group: 1
+      
+      - type: kval
+        name: "server-header"
+        kval:
+          - "Server"
+        part: header
+      
+      - type: json
+        name: "api-data"
+        json:
+          - "data.message"
+          - "result.status"
+        part: body
+      
+      - type: dsl
+        name: "response-info"
+        dsl:
+          - "status_code"
+          - "content_length"
+
+  - method: POST
+    path:
+      - "/api/test"
+    
+    headers:
+      Content-Type: "application/json"
+    
+    body: '{"test": "ruclei"}'
+    
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 400
+        name: "post-response"
+    
+    extractors:
+      - type: regex
+        name: "response-id"
+        regex:
+          - '"id":\s*"?([^",\s]+)"?'
+        part: body
+

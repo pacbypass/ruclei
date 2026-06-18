@@ -1,0 +1,38 @@
+id: common-endpoints-scan
+
+info:
+  name: Common Endpoints Discovery
+  author: [ruclei]
+  severity: low
+  description: Check for common endpoints and directories
+  tags: [discovery, endpoints]
+
+requests:
+  - method: GET
+    path:
+      - "/admin"
+      - "/login"
+      - "/robots.txt"
+      - "/sitemap.xml"
+      - "/wp-admin"
+      - "/.git/config"
+      - "/backup"
+      - "/config"
+    
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 301
+          - 302
+          - 403
+        name: "interesting-response"
+      - type: word
+        words:
+          - "admin"
+          - "login"
+          - "password"
+          - "config"
+        part: body
+        case_insensitive: true
+        name: "interesting-content"

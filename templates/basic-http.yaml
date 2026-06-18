@@ -1,0 +1,29 @@
+id: basic-http-test
+
+info:
+  name: Basic HTTP Status Check
+  author: [ruclei]
+  severity: info
+  description: Check if target returns HTTP 200 status code
+  tags: [test, http, status]
+
+requests:
+  - method: GET
+    path:
+      - "/"
+      - "/robots.txt"
+      - "/favicon.ico"
+    
+    matchers:
+      - type: status
+        status:
+          - 200
+        name: "http-200"
+    
+    extractors:
+      - type: regex
+        name: "title"
+        regex:
+          - '<title>([^<]+)</title>'
+        part: body
+        group: 1

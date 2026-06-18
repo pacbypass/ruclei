@@ -1,0 +1,27 @@
+id: server-version-detection
+info:
+  name: Server Version Detection
+  author: [ruclei]
+  severity: info
+  description: Detect web server version from headers
+  tags: [detection, headers]
+
+requests:
+  - method: GET
+    path:
+      - "/"
+    
+    matchers:
+      - type: word
+        words:
+          - "Server:"
+        part: header
+        name: "server-header"
+    
+    extractors:
+      - type: kval
+        name: "server"
+        kval:
+          - "Server"
+        part: header
+
